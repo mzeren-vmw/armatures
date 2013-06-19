@@ -103,7 +103,6 @@ Index of ARMs
   <td>0.0.0</td>
   <td>March 1, 2013</td>
   <td>New</td>
-</tr>
 </tr><tr>
   <td>11</td>
   <td><a href="arm-11.execution_model/index.md">Execution Model</a></td>
@@ -122,15 +121,14 @@ Index of ARMs
   <td>13</td>
   <td><a href="arm-13.ssl_behaviour/index.md">SSL Behaviour</a></td>
   <td>Describe Puppet's use of SSL, configuration options, and best practices.
-</td>
+</tr><tr>
   <td>0.0.1</td>
   <td>April 17, 2013</td>
   <td>New</td>
 </tr><tr>
   <td>14</td>
   <td><a href="arm-14.reboot/index.md">Managing System Reboots</a></td>
-  <td>Describe Puppet's ability for managing system reboots.
-</td>
+  <td>Describe Puppet's ability for managing system reboots.</td>
   <td>0.0.1</td>
   <td>April 17, 2013</td>
   <td>New</td>

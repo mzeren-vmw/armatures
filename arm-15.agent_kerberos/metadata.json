@@ -1,0 +1,13 @@
+{
+   "arm": 15,
+   "title": "Agent Kerberos",
+   "champion":"mzeren-vmw",
+   "project":"https://github.com/mzeren-vmw/puppet/ XXX",
+   "revision":"0.0.1",
+   "requires":[
+   ],
+   "issues":[
+   ],
+   "implementation":[
+   ],
+}

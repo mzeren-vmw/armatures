@@ -132,6 +132,13 @@ Index of ARMs
   <td>0.0.1</td>
   <td>April 17, 2013</td>
   <td>New</td>
+</tr><tr>
+  <td>15</td>
+  <td><a href="arm-15.agent_kerberos/index.md">Kerberos Authentication for Agents</a></td>
+  <td>Add support for agent authentication via Kerberos/SPNEGO, without client certificates</td>
+  <td>0.0.1</td>
+  <td>April 17, 2013</td>
+  <td>New</td>
 </tr>
 
 </table>

@@ -1,6 +1,39 @@
 ARM-15: Agent Kerberos
 ======================
 
+TODO
+----
+
+* figure out why kinit -k is needed for knode. Is this a limitation of
+  simple.rb? or of gssapi module?
+
+* figure out how to do dname without name/password. Need to look at wireshark
+  traces of working windows client.
+
+* how to handle multiple host names in account --> hostname lookup
+
+* even with channel binding each time we send a request we create a new
+  connection and we send catalog info *before* authenticating the server. Once
+  we have channel binding we need to use persistent connections and "login" each
+  connection with a no-op initial request that does the mutual auth.
+
+* submit facter fix
+
+* submit gssapi fix.
+
+* figure out gssapi licensing
+
+* clean up demo patch
+
+* clean up redmine bugs
+
+* cean up armature
+
+* prototype external lookup service?
+
+* non-roman Kerberos principle names? Is this an important case for puppet yet?
+
+
 Summary
 -------
 
@@ -119,48 +152,9 @@ puppet can retrieve it.
 Puppet Master Enhancements
 --------------------------
 
-Two puppet master enhancemnts are required: changes to Network::AuthStore to
-support Kerberos principle names, and changes to Network::Http::Rack to
-support REMOTE_USER environment variable.
-
-Kerberos Principles and Case Sensetivity
-----------------------------------------
-
-Puppet has an existing limitation of supporting only lowercase agent
-"certificate names". This limitation is enforced in the puppet agent
-configuration code. Non-lowercase names will be rejected. Master-side code also
-depends on this restriction. For example agent certificate names are used as
-file names on case insensetive file systems. Puppet has been successful despite
-this limitiation because most agent hosts use case insensetive DNS names.
-Additionally since puppet typically acts as a certificate authority agent
-configuration files can give hosts alternate, lowercase "certificate names" as
-necessary.
-
-Kerberos principle names, howerver, are case sensetive and mod_auth_kerb will
-provide the full mixed case name in the REMOTE_USER environment variable.
-
-This ARM intentionally avoids including or taking a dependency on a fix for this
-limitation by downcasing all Kerberos principle names at the puppet master. This
-is unlikely to be an operational issue as it is unusual to have two principle
-names that differ only in case. This ARM requires that the Kerberos domain and
-any certificate authorities do not allow lowercased name collisions.
-
-Active Directory Service Accounts and $
----------------------------------------
-
-Windows Active Directory service account names traditionally end in '$'.
-Computer accounts are service accounts so in a Active Directory environment all
-puppet agent principle names will end in $. For example:
-
-  myagenthost$@EXAMPLE.COM
-
-The Networkd::AuthStore module in puppet currently does not permit $ in "node"
-names. The currently proposed solution is to extend the ':opaque' name pattern
-to support $.
-
-In addition, agent names are used in file system names. The code for
-manipulating these file system names will be tested and enhanced to support $ as
-necessary.
+Two puppet master enhancemnts are required: changes to Network::Http::Rack to
+support REMOTE_USER environment variable, and adding a Kerberos principle to
+host name lookup facility.
 
 REMOTE_USER Support
 -------------------
@@ -200,6 +194,46 @@ Kerberos and also provides a verfiable client certificate. To maintain backward
 compatibility in this case the REMOTE_USER environment variable is ignored and
 this state is otherwise treated as VERIFIED. [TODO: should we provide a warning
 in this case?]
+
+Kerberos Principles and Case Sensetivity
+----------------------------------------
+
+Kerberos 
+Puppet has an existing limitation of supporting only lowercase agent
+"certificate names" (TODO add issue number). Additionally Network::AuthStore does not
+
+Kerberos principle names, howerver,
+are case sensetive and mod_auth_kerb will provide the full mixed case name in
+the REMOTE_USER environment variable. This ARM works around this limitation by
+looking up the host name of the agent in Active Directory.
+
+
+This limitation is enforced in the
+puppet agent configuration code. Non-lowercase names will be rejected.
+Master-side code also depends on this restriction. For example agent certificate
+names are used as file names on case insensetive file systems. Puppet has been
+successful despite this limitiation because most agent hosts use case
+insensetive DNS names. Additionally since puppet typically acts as a certificate
+authority agent configuration files can give hosts alternate, lowercase
+"certificate names" as necessary.
+
+
+Active Directory Service Accounts and $
+---------------------------------------
+
+Windows Active Directory service account names traditionally end in '$'.
+Computer accounts are service accounts so in a Active Directory environment all
+puppet agent principle names will end in $. For example:
+
+  myagenthost$@EXAMPLE.COM
+
+The Network::AuthStore module in puppet currently does not permit $ in "node"
+names. The currently proposed solution is to extend the ':opaque' name pattern
+to support $.
+
+In addition, agent names are used in file system names. The code for
+manipulating these file system names will be tested and enhanced to support $ as
+necessary.
 
 Agent Changes
 -------------

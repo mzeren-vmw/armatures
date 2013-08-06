@@ -5,7 +5,7 @@ Summary
 -------
 
 Allow agent authentication via Kerberos using GSSAPI and SPNEGO as an
-alternative to puppet agent certificates.
+alternative to Puppet agent certificates.
 
 Motivation
 ----------
@@ -19,8 +19,8 @@ This ARM is motivated by:
    within an organization.
 
 3) The **operational efficiency** gained by using an existing Kerberos
-   infrastructure in lieu of deploying and securing an additional certificate
-   authority.
+   infrastructure in lieu of deploying certificate infrastructure for Puppet
+   agents.
 
 This new capability will benefit organizations that have an established Kerberos
 infrastructure that they wish to leverage for Puppet agent authentication.
@@ -30,15 +30,15 @@ would require two priviledged operations: one to add it to the Kerberos domain,
 and a second to add it to Puppet. With this feature adding the host to the
 domain can automatically add it to Puppet.
 
-> **NOTE**: acording to the ARM spec "Motivation" should be below Goals and
-Non-Goals, but it seems best placed here...
+**NOTE**: acording to the [ARM template][ARM] the "Motivation" section should be below
+Goals and Non-Goals, but it seems best placed here...
 
 Goals
 -----
 
 This ARM has the following goals:
 
-* Add a minimal set of enhancements to the puppet master and agent
+* Add a minimal set of enhancements to the Puppet master and agent
   infrastructure to allow agent authentication via SPNEGO/Kerberos.
 
 * Support Linux agents that have a pre-existing, functioning, GSSAPI
@@ -50,7 +50,7 @@ This ARM has the following goals:
 
 * Allow the majority of agent functionality to operate securely without a client
   certificate -- eliminating the need to deploy and secure certificate authority
-  infrastructure for puppet clients.
+  infrastructure for Puppet clients.
 
 * Allow Kerberos based authentication to co-exist with client certificate based
   authentication on the same http server and port.
@@ -58,7 +58,7 @@ This ARM has the following goals:
 * Introduce no new hard dependencies. The gssapi and ffi gems are required on
   both master and agent, but only when this feature is configured.
 
-* Document the necessary web server and puppet configuration.
+* Document the necessary web server and Puppet configuration.
 
 Non-Goals
 ---------
@@ -91,22 +91,22 @@ Non-Goals
 Description
 -----------
 
-This ARM covers three broad areas of work: web server configuration, puppet
-master enhancements, and puppet agent enhancemnets.
+This ARM covers three broad areas of work: web server configuration, Puppet
+master enhancements, and Puppet agent enhancemnets.
 
 ### Web Server Configuration ###
 
 Configuration of the apache2 web server is relatively straighforward. After
 configuring apache normally the additional steps involve installing and enabling
-mod_auth_kerb and adding several settings in the puppetmaster virtual host
-configuration file. This ARM will update example configuration files and related
+mod_auth_kerb and adding several settings in the virtual host configuration
+file. This ARM will update example configuration files and related
 documentation.
 
 > **TODO**: list explicit doc pages and example configuration files to update.
 
 Once successfully configured and IFF a request is authenticated, mod_auth_kerb
 will place the Kerberos principle name in the REMOTE_USER environment variable
-where puppet can retrieve it.
+where Puppet can retrieve it.
 
 > **TODO**: there is a known issue with non-local apache hosts that forward
 requests to the master. I have been unable to copy the REMOTE_USER value to an
@@ -116,7 +116,7 @@ HTTP X header.
 
 ### Puppet Master Enhancements ###
 
-Two puppet master enhancemnts are required: changes to the `Network::Http::Rack`
+Two Puppet master enhancemnts are required: changes to the `Network::Http::Rack`
 module to support the `REMOTE_USER` environment variable, and adding a hostname
 lookup facility.
 
@@ -292,3 +292,8 @@ the client certificate CN.
 * Reverse proxy support (need to figure out how to get REMOTE_USER into an HTTP header)
 
 - Other: ...
+
+References
+----------
+
+[ARM] https://github.com/puppetlabs/armatures/blob/master/arm-1.templates/templates/index.md

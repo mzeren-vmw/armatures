@@ -22,16 +22,16 @@ This ARM is motivated by:
    infrastructure in lieu of deploying certificate infrastructure for Puppet
    agents.
 
-This new capability will benefit organizations that have an established Kerberos
-infrastructure that they wish to leverage for Puppet agent authentication.
+Organizations that have an established Kerberos infrastructure will benefit from
+this enhancement to Puppet. As an example, without this feature setting
+up a new Puppet managed host would require two privileged operations: one to
+add it to the Kerberos domain, and a second to add it to Puppet. With this
+feature adding the host to the domain can automatically add it to Puppet.
 
-As a concrete example, without this feature setting up a new Puppet managed host
-would require two priviledged operations: one to add it to the Kerberos domain,
-and a second to add it to Puppet. With this feature adding the host to the
-domain can automatically add it to Puppet.
+> **NOTE**: The "Motivation" section seems best placed here even though
+according to the [ARM template][ARM] it should be below Goals and Non-Goals.
 
-**NOTE**: acording to the [ARM template][ARM] the "Motivation" section should be below
-Goals and Non-Goals, but it seems best placed here...
+[ARM]: ../arm-1.templates/templates/index.md
 
 Goals
 -----
@@ -53,10 +53,10 @@ This ARM has the following goals:
   infrastructure for Puppet clients.
 
 * Allow Kerberos based authentication to co-exist with client certificate based
-  authentication on the same http server and port.
+  authentication on the same HTTP server and port.
 
-* Introduce no new hard dependencies. The gssapi and ffi gems are required on
-  both master and agent, but only when this feature is configured.
+* Introduce no new hard dependencies. The gssapi, ffi, and ruby-net-ldap gems
+  are used, but only required when configured.
 
 * Document the necessary web server and Puppet configuration.
 
@@ -75,30 +75,28 @@ Non-Goals
   it should be possible to switch to such a general purpose facility should it
   become available in the future.
 
-* This ARM continues to rely on the agent verifying a master certificate during
-  the SSL handshake to protect against man-in-the-middle (MITM) attacks. (See
-  HTTPS Channel Binding below.)
+* This ARM continues to require that the agent verify the master certificate
+  during the SSL handshake to protect against man-in-the-middle (MITM) attacks.
 
-* This ARM does not include support for connections from the master to the
-  agent. (See HTTPS Channel Binding below). Secure master to agent communication
-  may, in theory, be achieved via a Kerberos/GSSAPI compatible message bus and
-  MCollective, though this ARM does not provide any information on how to
-  configure and use MCollective.
+* This ARM does not include support for HTTPS connections from the master to the
+  agent, such as kick. Secure master to agent communication may, in theory, be
+  achieved via a Kerberos/GSSAPI compatible message bus and MCollective, though
+  this ARM does not provide any information on how to configure and use
+  MCollective.
 
-* This ARM does not provide any information on how to correctly configure
-  GSSAPI/Kerberos.
+* This ARM does not describe how to correctly configure GSSAPI or otherwise
+  setup Kerberos infrastructure.
 
 Description
 -----------
 
 This ARM covers three broad areas of work: web server configuration, Puppet
-master enhancements, and Puppet agent enhancemnets.
+master enhancements, and Puppet agent enhancements.
 
 ### Web Server Configuration ###
 
-Configuration of the apache2 web server is relatively straighforward. After
-configuring apache normally the additional steps involve installing and enabling
-mod_auth_kerb and adding several settings in the virtual host configuration
+Configuration of the apache2 web server is relatively straightforward. It
+requires mod_auth_kerb and several additions to the virtual host configuration
 file. This ARM will update example configuration files and related
 documentation.
 
@@ -116,23 +114,25 @@ HTTP X header.
 
 ### Puppet Master Enhancements ###
 
-Two Puppet master enhancemnts are required: changes to the `Network::Http::Rack`
+Two Puppet master enhancements are required: changes to the `Network::Http::Rack`
 module to support the `REMOTE_USER` environment variable, and adding a hostname
-lookup facility.
+look up facility.
 
 #### REMOTE_USER Support ####
 
 `Network::Http::Rack#extract_client_info` extracts authentication information
-from incoming requests. It looks at the `HTTP_X_CLIENT_DN`,
-`HTTP_X_CLIENT_VERIFY`, and uses them to determin a "`:node`" name and an
-"`:authenticated`" boolean value. The existing behavior for SSL based
-authentication remains unchanged. When SSL cannot authenticate the client the
-master checks the `REMOTE_USER` to see if it can be used to authenticate the
-client and provide a hostname. If successful it considers the client as
-authenticated and uses the hostname as the `:node`.
+from incoming requests. It looks at the `HTTP_X_CLIENT_DN` and
+`HTTP_X_CLIENT_VERIFY` environment variables and uses them to deter min a
+"`:node`" name and an "`:authenticated`" boolean value. The existing behavior
+for client certificate authentication remains unchanged. When certificate
+authentication fails the master newly checks the `REMOTE_USER` environment
+variable to authenticate the agent. If it can look up a hostname based on the
+value of `REMOTE_USER` then it uses the hostname as `:node` and sets
+`'authenticated` to `true`.
 
 The following table summarizes the possible input states and their corresponding
-results. (State names are for this document only and are not part of the implementation.)
+results. (The state names below are for this document only and are not part of
+the implementation.)
 
 STATE             | DN             | VERIFY  | REMOTE_USER     | :node          | :authenticated
 ------------------|----------------|---------|-----------------|----------------|---------------
@@ -155,100 +155,111 @@ facility that looks up a corresponding hostname.
 
 The `UNVERIFIED_W_KERB` state occurs when an agent successfully authenticates via
 Kerberos and also provides an unverifiable client certificate. In this case the
-client certificate is ignorned and this state is otherwise treated as `KERB`.
+client certificate is ignored and this state is otherwise treated as `KERB`.
 
-> **TODO**: should UNVERIFIED\_W\_KERB generate a warning?
+> **TODO**: should UNVERIFIED\_W\_KERB generate a warning? Yes.
 
-The `VERFIFIED_W_KERB` state occurs when an agent successfully authenticates via
-Kerberos and also provides a verfiable client certificate. To maintain backward
+The `VERIFIED_W_KERB` state occurs when an agent successfully authenticates via
+Kerberos and also provides a verifiable client certificate. To maintain backward
 compatibility in this case the `REMOTE_USER` environment variable is ignored and
 this state is otherwise treated as `VERIFIED`.
 
-> **TODO**: should VERIFIED\_W\_KERB generate a warning?
+> **TODO**: should VERIFIED\_W\_KERB generate a warning? Yes.
 
-#### Hostname Lookup ####
+#### Hostname Look Up ####
 
-### Puppet Agent Enhancemnts ###
+Once the Kerberos principle has been retrieved from `REMOTE_USER` it is
+translated to a hostname via an LDAP look up service. It is anticipated that this
+will be an external service analogous to the external node classifier. Using an
+external service facilitates using credentials other than the puppet account for
+the LDAP look up. It also facilitates customization and restart / cache flush of
+the look up service.
+
+> **QUESTION**: Should we follow the example of the external node classifier? Or
+is there something simpler or more "modern" that we should consider?
+
+In the current prototype implementation the service is "mocked" with a simple
+Ruby class that uses ruby-net-ldap to do a Windows Active Directory specific
+query. As a convenience while prototyping, configuration settings provide the
+LDAP account and password.
+
+### Puppet Agent Enhancements ###
 
 Two agent changes are required: implementation of the SPNEGO protocol in
-`Puppet::Network::HTTP::Connection`, and support for certficate-less agents.
+`Puppet::Network::HTTP::Connection`, and support for certificate-less agents.
 
 #### SPNEGO Support ####
 
 Adding SPNEGO support based on the gssapi gem requires adding an appropriately
 formatted `Authorization` header to agent HTTP requests. The master responds
 with an `www-authenticate` header which is then passed back to GSSAPI. This may
-repeat for several iterations before authentication completes.
-
-> **TODO**: The current prototype implementation assumes the negotiation
-completes in a single roundtrip.
+repeat for several iterations before authentication completes. In the current
+prototype a boolean configuration setting controls use of SPNEGO.
 
 **Note**: The agent still requires that the server certificate be verified to
 prevent MITM attacks.
 
-In the current prototype use of SPNEGO is controlled by a boolean configuration
-setting.
+> **TODO**: The current prototype implementation assumes the negotiation
+completes in a single round trip.
 
 #### Certificate-less Agents ####
 
 Puppet agent normally requires the existence of a signed agent certificate. The
 `Puppet::SSL::Host` class manages the lifecycle of this certificate. When
 configured for Kerberos authentication the agent runs without a certificate. The
-`Host` class will be modified to support both modes of operation.
-
-In the current prototype a configuration setting turns makes several methods of
-`Host` into no-ops.
-
-#### Hostname Lookup ####
-
-
+`Host` class will be modified to support both modes of operation. In the current
+prototype a configuration setting turns makes several methods of `Host` into
+no-ops.
 
 Testing and Evaluation
 ----------------------
 
-[TODO: fill out testing and evaluation]
+> **TODO**: fill out testing and evaluation
 
-* Spec, unit, tests.
-
-* Provide curl example for how to test a master from the command line.
-
+* Spec tests.
+* Unit tests.
+* Command line example of using curl to test master configuration.
 * Etc....
 
 
 Alternatives and Recommendation
 -------------------------------
 
-In terms of implementation alternatives we explored using the Kerberos principle
-name directly as the "node" name. A typical Kerberos principle would be
+We explored an alternate implementation that used Kerberos principle names
+directly as "node" names. A typical Kerberos principle has the form
 host$@EXAMPLE.COM. Supporting the mixed case and $ character required changes to
-the AuthStore and was expected to lead to further complications with e.g.
-filesystem support for the $. The current approach of using a principle to
-hostname lookup service proved much simpler.
+the Puppet AuthStore and was expected to lead to further complications with e.g.
+file system support for the $. The current approach of using a hostname look up
+service proved much simpler.
 
-In terms of alternatives to the feature itself, customers still have the
-opportunity to use Puppet's built-in CA capabilities or to integrate with
-external CA's. These are all valid approaches and they can in fact be combinded.
-We recommend Kerberos only for customers who already have a functioning Kerberos
-infrastructure.
+In terms of alternatives to the feature itself customers can always use Puppet's
+existing certificate support.
+
+We recommend this new functionality only for customers who already have a
+functioning Kerberos infrastructure.
 
 Risks and Assumptions
 ---------------------
 
-* multiple request transmits due to multiple token exchanges in SPNEGO.
+* Implementor availability.
 
-* authentication on each request instead of on each connection
+* Armature process.
 
-* channel binding
+* Requirements for broader platform support will significantly slow development.
+  The initial target of Linux agents integrated with Active Directory is
+  probably the most common configuration that would benefit from this ARM.
+
+> **TODO**: add more Risks and Assumptions ...
 
 
 Dependencies
 ------------
 
-Describe all dependencies that this ARM has on other ARMs, components,
-products, or anything else.  Dependences upon other ARMs should also
-be listed in the "depends:" field in the metadata.json.
+This ARM depends on the gssapi gem which in turn depends on the ffi gem. The
+hostname look up capability depends on the ruby-net-ldap gem.
 
-Describe any ARMs that depend upon this ARM before they can be implemented.
+These dependencies are optional if the enhancements described in this ARM are
+not enabled via configuration settings.
 
 Impact
 ------
@@ -256,44 +267,66 @@ Impact
 How will this work impact other parts of the platform, the product,
 and the contributors working on them?  Omit any irrelevant items.
 
-- Other Puppet components: ...
+### kick ###
 
-* kick
+As described above HTTPS based master -> agent requests are not secured with
+certificate-less agents, so this feature prevents the use of kick over HTTP.
+MCollective is expected to replace HTTPS for master -> agent communication in
+the future.
 
-* MCollective
+### MCollective ###
 
-- Compatibility: ...
-- Security: ...
+MCollective should work if it uses a Kerberos capable message bus. However, no
+research has yet been done on MCollective.
 
-* Channel Binding and master->agent MITM protection.
+> **QUESTION**: Is there an MCollective expert who could outline the MCollective
+road map and how it would interact with Kerberos infrastructure?
 
-- Performance/scalability: ...
+### Backward Compatibility ###
 
-* Latency for contacting KDC
+This enhancement should be backward compatible with most existing installations.
+There are a few corner cases where behavior might change. For example if an
+agent's certificate lapses and the web infrastructure is setting the REMOTE_USER
+environment variable. When the certificate lapses the REMOTE_USER variable will
+newly have an effect. These types of corner cases are really miss-configurations
+and are and acceptable risk.
 
-* Multiple re-sends for multiple token exchange.
+### Security ###
 
-* Reverse proxy support. Based on current experimentation it does not seem
-possible to place the principle name into an HTTP extension header as we do for
-the client certificate CN.
+> **TODO**: Flesh out Security
 
-- User experience: ...
-- I18n/L10n: ...
-- Accessibility: ...
-- Portability: ...
-- Packaging/installation: ...
-- Documentation: ...
-- Spin-offs/Future work: ...
+###  Performance and Scalability ###
 
-* SSPI support
+> **TODO**: Flesh out Performance and Scalability
 
-* Channel Binding
+* Latency for contacting Kerberos domain controller during authentication.
 
-* Reverse proxy support (need to figure out how to get REMOTE_USER into an HTTP header)
+* Authenticate on each request.
+    * Mitigated by existing inefficiency of `Connection: close`  behavior.
+    * Mitigated by future migration to MCollective.
 
-- Other: ...
+* Reverse proxy support - Based on current experimentation it does not seem
+  possible to place the principle name into an HTTP extension header as we do
+  for the client certificate CN. This needs further investigation, but it could
+  be a limitation of mod_auth_kerb.
 
-References
-----------
+### Portability ###
 
-[ARM] https://github.com/puppetlabs/armatures/blob/master/arm-1.templates/templates/index.md
+* ffi includes native code which could limit portability. OTOH if GSSAPI exists
+  for a platform it's likely that ffi will build on or be easily ported to that
+  platform.
+
+### Future work ###
+
+* SSPI API support for Windows agents. Is there a gem for SSPI interop?
+
+* Support and testing with MIT Kerberos domain controllers / LDAP schemas.
+
+* Reverse proxy support (need to figure out how to get REMOTE_USER into an HTTP
+  header)
+
+* Describe how Kerberos "channel binding" could be used to prevent MITM without
+  a master certificate. Channel binding could also eliminate the need to
+  authenticate on each request. OTOH channel binding is a complex topic and not
+  well understood by the authors so perhaps it should not be mentioned here....
+

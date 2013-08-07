@@ -41,12 +41,8 @@ This ARM has the following goals:
 * Add a minimal set of enhancements to the Puppet master and agent
   infrastructure to allow agent authentication via SPNEGO/Kerberos.
 
-* Support Linux agents that have a pre-existing, functioning, GSSAPI
-  infrastructure and a computer account in a Windows Active Directory domain.
-
-* Support the apache2 web server.
-> **TODO**: we also anticipate support for nginx,
-  however no work has been done for that yet.
+* Support **Linux agent hosts** that have a functioning **GSSAPI infrastructure** and a
+  **computer account** in a **Windows Active Directory** domain.
 
 * Allow the majority of agent functionality to operate securely without a client
   certificate -- eliminating the need to deploy and secure certificate authority
@@ -54,6 +50,10 @@ This ARM has the following goals:
 
 * Allow Kerberos based authentication to co-exist with client certificate based
   authentication on the same HTTP server and port.
+
+* Support the apache2 web server.
+> **TODO**: we also anticipate support for nginx,
+  however no work has been done for that yet.
 
 * Introduce no new hard dependencies. The gssapi, ffi, and ruby-net-ldap gems
   are used, but only required when configured.
@@ -63,13 +63,18 @@ This ARM has the following goals:
 Non-Goals
 ---------
 
-* This ARM does not provide a general purpose "pluggable" authentication
-  framework.
+* This ARM does not include support for the Windows SSPI API (for Windows
+  agents), though that would likely be a straightforward extension of this work.
+
+* This ARM supports only the Active Directory Kerberos implementation. This
+  limitation is largely due to available testing resources. It is likely that
+  other Kerberos implementations would be supported with little to no
+  modification.
 
 * This ARM does not support the webrick web server.
 
-* This ARM does not include support for the Windows SSPI API (for Windows
-  agents), though that would likely be a straightforward extension of this work.
+* This ARM does not provide a general purpose "pluggable" authentication
+  framework.
 
 * This ARM does not include a general purpose Ruby SPNEGO implementation, though
   it should be possible to switch to such a general purpose facility should it
@@ -79,10 +84,9 @@ Non-Goals
   during the SSL handshake to protect against man-in-the-middle (MITM) attacks.
 
 * This ARM does not include support for HTTPS connections from the master to the
-  agent, such as kick. Secure master to agent communication may, in theory, be
-  achieved via a Kerberos/GSSAPI compatible message bus and MCollective, though
-  this ARM does not provide any information on how to configure and use
-  MCollective.
+  agent, such as kick. Secure master to agent communication may be possible via
+  a Kerberos/GSSAPI compatible message bus and MCollective, though this ARM does
+  not provide any information on how to configure and use MCollective.
 
 * This ARM does not describe how to correctly configure GSSAPI or otherwise
   setup Kerberos infrastructure.
@@ -199,17 +203,13 @@ prototype a boolean configuration setting controls use of SPNEGO.
 **Note**: The agent still requires that the server certificate be verified to
 prevent MITM attacks.
 
-> **TODO**: The current prototype implementation assumes the negotiation
-completes in a single round trip.
-
 #### Certificate-less Agents ####
 
 Puppet agent normally requires the existence of a signed agent certificate. The
 `Puppet::SSL::Host` class manages the lifecycle of this certificate. When
 configured for Kerberos authentication the agent runs without a certificate. The
 `Host` class will be modified to support both modes of operation. In the current
-prototype a configuration setting turns makes several methods of `Host` into
-no-ops.
+prototype a configuration setting turns several methods of `Host` into no-ops.
 
 Testing and Evaluation
 ----------------------
@@ -232,18 +232,11 @@ the Puppet AuthStore and was expected to lead to further complications with e.g.
 file system support for the $. The current approach of using a hostname look up
 service proved much simpler.
 
-In terms of alternatives to the feature itself customers can always use Puppet's
-existing certificate support.
-
-We recommend this new functionality only for customers who already have a
-functioning Kerberos infrastructure.
 
 Risks and Assumptions
 ---------------------
 
 * Implementor availability.
-
-* Armature process.
 
 * Requirements for broader platform support will significantly slow development.
   The initial target of Linux agents integrated with Active Directory is
@@ -258,14 +251,11 @@ Dependencies
 This ARM depends on the gssapi gem which in turn depends on the ffi gem. The
 hostname look up capability depends on the ruby-net-ldap gem.
 
-These dependencies are optional if the enhancements described in this ARM are
-not enabled via configuration settings.
+These dependencies are only required if the features described above are enabled
+via configuration settings.
 
 Impact
 ------
-
-How will this work impact other parts of the platform, the product,
-and the contributors working on them?  Omit any irrelevant items.
 
 ### kick ###
 
@@ -289,7 +279,7 @@ There are a few corner cases where behavior might change. For example if an
 agent's certificate lapses and the web infrastructure is setting the REMOTE_USER
 environment variable. When the certificate lapses the REMOTE_USER variable will
 newly have an effect. These types of corner cases are really miss-configurations
-and are and acceptable risk.
+and are an acceptable risk.
 
 ### Security ###
 
@@ -312,9 +302,7 @@ and are and acceptable risk.
 
 ### Portability ###
 
-* ffi includes native code which could limit portability. OTOH if GSSAPI exists
-  for a platform it's likely that ffi will build on or be easily ported to that
-  platform.
+* ffi includes native code which could limit portability.
 
 ### Future work ###
 
